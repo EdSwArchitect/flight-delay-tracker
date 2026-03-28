@@ -41,7 +41,10 @@ flight-tracker/
 │   └── stop.sh                      ← cluster teardown (chmod +x)
 ├── k8s/
 │   ├── kind-config.yaml
-│   └── schema.sql
+│   ├── schema.sql
+│   └── validation-runbook.sh       ← end-to-end deployment validation
+├── docs/
+│   └── architecture.md             ← detailed architecture documentation
 ├── charts/
 │   ├── flight-tracker/              ← umbrella Helm chart
 │   │   ├── Chart.yaml
@@ -61,11 +64,11 @@ flight-tracker/
 │       ├── loki-values.yaml
 │       └── alloy-values.yaml
 └── services/
-    ├── opensky-poller/              ← Java 25, polls OpenSky positions
-    ├── airlabs-poller/              ← Java 25, polls AirLabs delays + schedules
-    ├── join-service/                ← Java 25, merges position + schedule data
-    ├── api/                         ← Java 25, Javalin REST API
-    ├── ws-server/                   ← Java 25, Javalin WebSocket broadcaster
+    ├── opensky-poller/              ← Java 21, polls OpenSky positions
+    ├── airlabs-poller/              ← Java 21, polls AirLabs delays + schedules
+    ├── join-service/                ← Java 21, merges position + schedule data
+    ├── api/                         ← Java 21, Javalin REST API
+    ├── ws-server/                   ← Java 21, Javalin WebSocket broadcaster
     └── map-ui/                      ← TypeScript, React + MapLibre + Deck.gl
 ```
 
@@ -133,7 +136,8 @@ FlightSchedule and FlightDelay are in package `com.bscllc.flightdelays.airlabs`.
 
 ## Join resolution algorithm
 
-The join-service resolves each OpenSky StateVector to a FlightSchedule in 3 steps:
+The join-service resolves each OpenSky StateVector to a FlightSchedule in 3 steps.
+Resolution logic is in `CallsignResolver.java` (extracted for testability):
 
 1. **Exact match** — `callsign.strip()` against `callsign:index` Redis key (Map<String, FlightSchedule>)
 2. **ICAO prefix normalisation** — map ICAO airline prefix to IATA (AAL→AA, BAW→BA, DAL→DL, UAL→UA, SWA→WN, AWE→US, FFT→F9, JBU→B6, SKW→OO, ENY→MQ) and retry
@@ -303,6 +307,12 @@ skaffold dev --profile=local --port-forward
 mvn clean package -DskipTests
 skaffold build --profile=local
 
+# Run tests (50 JUnit 5 tests across all services)
+mvn test
+
+# Validate deployment
+bash k8s/validation-runbook.sh
+
 # Tail logs
 kubectl logs -n ingestion -l app=opensky-poller -f
 kubectl logs -n ingestion -l app=airlabs-poller -f
@@ -354,7 +364,13 @@ Update this section as work progresses.
 Add dated notes here as implementation decisions are made.
 
 ```
-# Example format:
-# 2026-03-28: Set OPENSKY_POLL_INTERVAL_SEC=15 (default) to stay within 8000 credit/day limit
-# 2026-03-28: AirLabs delay endpoint returns array at root (not wrapped in {"response": [...]})
+# 2026-03-28: Downgraded from Java 25 to Java 21 (Corretto via SDKMAN) — virtual threads and records fully supported
+# 2026-03-28: Removed --enable-preview from compiler and Dockerfiles
+# 2026-03-28: DEP_AIRPORT env var added (default BWI) — configurable departure airport for AirLabs polling
+# 2026-03-28: AirLabs poller gracefully degrades when AIRLABS_API_KEY is empty or invalid
+# 2026-03-28: Replaced deprecated grafana/loki-stack with grafana/loki (SingleBinary) + grafana/alloy
+# 2026-03-28: Grafana ingress uses ExternalName service (grafana-proxy) for cross-namespace routing
+# 2026-03-28: Extracted CallsignResolver from FlightJoinApp for unit testability
+# 2026-03-28: Added 50 JUnit 5 tests across all 5 Java services
+# 2026-03-28: Postgres init schema ConfigMap must be created before Helm install (not after)
 ```
