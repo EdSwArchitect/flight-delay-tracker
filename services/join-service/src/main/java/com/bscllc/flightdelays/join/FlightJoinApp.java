@@ -35,13 +35,7 @@ public class FlightJoinApp {
     private static final int METRICS_PORT = Integer.parseInt(env("METRICS_PORT", "8083"));
     private static final int JOIN_INTERVAL = Integer.parseInt(env("JOIN_INTERVAL_SEC", "10"));
 
-    // ICAO 3-letter → IATA 2-letter airline mapping
-    private static final Map<String, String> ICAO_TO_IATA = Map.ofEntries(
-        Map.entry("AAL", "AA"), Map.entry("BAW", "BA"), Map.entry("DAL", "DL"),
-        Map.entry("UAL", "UA"), Map.entry("SWA", "WN"), Map.entry("AWE", "US"),
-        Map.entry("FFT", "F9"), Map.entry("JBU", "B6"), Map.entry("SKW", "OO"),
-        Map.entry("ENY", "MQ")
-    );
+    private static final CallsignResolver resolver = new CallsignResolver();
 
     // Metrics
     private static final PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
@@ -126,64 +120,56 @@ public class FlightJoinApp {
                                     Map<String, String> callsignIndex,
                                     RedisCommands<String, String> redis) throws Exception {
         Instant now = Instant.now();
+        CallsignResolver.Resolution resolution = resolver.resolve(callsign, callsignIndex);
 
-        if (callsign.isEmpty()) {
-            missBlankCallsign.increment();
-            joinsUnresolvable.increment();
-            return mapper.writeValueAsString(Map.of(
-                "type", "unresolvable",
-                "icao24", icao24,
-                "position", mapper.readTree(posJson),
-                "reason", "blank_callsign",
-                "resolvedAt", now.toString()
-            ));
-        }
-
-        // Step 1: Exact match
-        String scheduleJson = callsignIndex.get(callsign);
-
-        // Step 2: ICAO prefix normalisation
-        if (scheduleJson == null && callsign.length() >= 4) {
-            String prefix3 = callsign.substring(0, 3).toUpperCase();
-            String iataPrefix = ICAO_TO_IATA.get(prefix3);
-            if (iataPrefix != null) {
-                String iataCallsign = iataPrefix + callsign.substring(3).replaceFirst("^0+", "");
-                scheduleJson = callsignIndex.get(iataCallsign);
-                if (scheduleJson == null) {
-                    missNormalisation.increment();
-                }
+        switch (resolution.result()) {
+            case UNRESOLVABLE -> {
+                missBlankCallsign.increment();
+                joinsUnresolvable.increment();
+                return mapper.writeValueAsString(Map.of(
+                    "type", "unresolvable",
+                    "icao24", icao24,
+                    "position", mapper.readTree(posJson),
+                    "reason", resolution.reason(),
+                    "resolvedAt", now.toString()
+                ));
             }
+            case POSITION_ONLY -> {
+                if ("normalisation_miss".equals(resolution.reason())) {
+                    missNormalisation.increment();
+                } else {
+                    missNoMatch.increment();
+                }
+                joinsPositionOnly.increment();
+                return mapper.writeValueAsString(Map.of(
+                    "type", "position_only",
+                    "icao24", icao24,
+                    "position", mapper.readTree(posJson),
+                    "callsign", callsign,
+                    "resolvedAt", now.toString()
+                ));
+            }
+            case RESOLVED -> {
+                String scheduleJson = callsignIndex.get(resolution.matchedKey());
+                JsonNode schedule = mapper.readTree(scheduleJson);
+                String flightIata = schedule.get("flightIata").asText();
+
+                String delayJson = redis.get("flight:delay:" + flightIata);
+                JsonNode delay = delayJson != null ? mapper.readTree(delayJson) : null;
+
+                Map<String, Object> result = new HashMap<>();
+                result.put("type", "resolved");
+                result.put("icao24", icao24);
+                result.put("position", mapper.readTree(posJson));
+                result.put("schedule", schedule);
+                result.put("delay", delay);
+                result.put("resolvedAt", now.toString());
+
+                joinsResolved.increment();
+                return mapper.writeValueAsString(result);
+            }
+            default -> throw new IllegalStateException("Unknown resolution: " + resolution.result());
         }
-
-        if (scheduleJson == null) {
-            missNoMatch.increment();
-            joinsPositionOnly.increment();
-            return mapper.writeValueAsString(Map.of(
-                "type", "position_only",
-                "icao24", icao24,
-                "position", mapper.readTree(posJson),
-                "callsign", callsign,
-                "resolvedAt", now.toString()
-            ));
-        }
-
-        // Resolved — check for delay
-        JsonNode schedule = mapper.readTree(scheduleJson);
-        String flightIata = schedule.get("flightIata").asText();
-
-        String delayJson = redis.get("flight:delay:" + flightIata);
-        JsonNode delay = delayJson != null ? mapper.readTree(delayJson) : null;
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("type", "resolved");
-        result.put("icao24", icao24);
-        result.put("position", mapper.readTree(posJson));
-        result.put("schedule", schedule);
-        result.put("delay", delay);
-        result.put("resolvedAt", now.toString());
-
-        joinsResolved.increment();
-        return mapper.writeValueAsString(result);
     }
 
     private static String env(String key, String defaultValue) {

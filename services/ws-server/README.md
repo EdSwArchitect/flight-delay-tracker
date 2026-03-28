@@ -60,6 +60,14 @@ WebSocket server that broadcasts enriched flight data snapshots to connected bro
 | `ws.sessions.total{event}` | Counter | Session lifecycle events (`opened` / `closed`) |
 | `ws.broadcasts.total{type}` | Counter | Broadcast events by message type (`snapshot` / `heartbeat`) |
 
+## Tests
+
+```bash
+mvn test -pl services/ws-server
+```
+
+12 tests covering WebSocket envelope format (snapshot/delta/heartbeat), ISO 8601 timestamp validation, and concurrent session set thread safety.
+
 ## Build and run locally
 
 ```bash

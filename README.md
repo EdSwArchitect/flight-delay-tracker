@@ -17,11 +17,11 @@ Real-time flight tracking prototype that joins ADS-B position data with airline 
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 21, Javalin 6, Lettuce (async Redis), Micrometer |
+| Backend | Java 21, Javalin 6, Lettuce (async Redis), Micrometer, JUnit 5 |
 | Frontend | React 18, TypeScript, MapLibre GL JS 4, Deck.gl 9, Vite 5 |
 | Data stores | Redis (hot state, TTL-based), PostgreSQL (history, JSONB archive) |
 | Orchestration | Kind (Kubernetes-in-Docker), Helm 3, Skaffold |
-| Observability | Prometheus, Grafana, Loki |
+| Observability | Prometheus, Grafana, Loki, Alloy (log collector) |
 | Infrastructure | Nginx Ingress, Bitnami Redis/PostgreSQL charts |
 
 ## Architecture Overview
@@ -96,7 +96,8 @@ flight-delay-tracker/
 │   └── stop.sh              Cluster teardown
 ├── k8s/
 │   ├── kind-config.yaml     Kind cluster configuration
-│   └── schema.sql           Postgres schema (4 tables)
+│   ├── schema.sql           Postgres schema (4 tables)
+│   └── validation-runbook.sh  End-to-end deployment validation
 ├── charts/
 │   ├── flight-tracker/      Umbrella Helm chart with per-service subcharts
 │   └── deps/                Value overrides for third-party Helm charts
@@ -141,6 +142,22 @@ flight-delay-tracker/
 | `POSTGRES_PASSWORD` | airlabs-poller | (secret) | Postgres password |
 | `VITE_MAPTILER_KEY` | map-ui | (required) | MapTiler API key for map tiles |
 
+## Testing
+
+```bash
+mvn test
+```
+
+50 JUnit 5 tests across all services:
+
+| Service | Tests | Coverage |
+|---------|-------|----------|
+| opensky-poller | 12 | StateVector serialization, OpenSky response parsing |
+| airlabs-poller | 19 | FlightSchedule/FlightDelay records, AirLabs response parsing, error handling |
+| join-service | 21 | CallsignResolver 3-step chain, all 10 ICAO-to-IATA mappings |
+| api | 6 | REST JSON contract (health, flights, delays, errors) |
+| ws-server | 12 | WebSocket envelope format, concurrent session tracking |
+
 ## Development
 
 ### Build
@@ -183,6 +200,14 @@ kubectl get pods -A
 kubectl exec -n data deploy/redis-master -- redis-cli KEYS 'flight:*' | head -20
 kubectl exec -n data deploy/redis-master -- redis-cli GET flight:enriched:<icao24>
 ```
+
+### Validate deployment
+
+```bash
+bash k8s/validation-runbook.sh
+```
+
+Runs 8-stage checks: cluster, namespaces, pods, Redis data, Postgres data, HTTP endpoints, metrics, and ingress.
 
 ## Cleanup
 

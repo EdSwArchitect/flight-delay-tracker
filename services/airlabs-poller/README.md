@@ -63,6 +63,14 @@ Polls the AirLabs Data API for flight schedules and delay information, builds a 
 | `airlabs.index.size` | Gauge | Number of entries in the `callsign:index` hash |
 | `airlabs.parse.errors` | Counter | Individual entry parse/processing failures |
 
+## Tests
+
+```bash
+mvn test -pl services/airlabs-poller
+```
+
+19 tests covering FlightSchedule/FlightDelay record serialization, AirLabs response parsing (schedule and delay endpoints), error response detection for invalid API keys, nullable field handling, and bare vs wrapped array formats.
+
 ## Build and run locally
 
 ```bash

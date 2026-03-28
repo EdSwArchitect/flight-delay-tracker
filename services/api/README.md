@@ -56,6 +56,14 @@ Javalin REST API that serves enriched flight data and delay information from Red
 | `http.requests.total{method,path,status}` | Counter | Request count by HTTP method, matched path, and response status |
 | `http.request.duration.seconds{method,path}` | Histogram | Request duration by HTTP method and matched path |
 
+## Tests
+
+```bash
+mvn test -pl services/api
+```
+
+6 tests covering REST JSON contract validation: health endpoint, resolved/position-only/unresolvable flight structures, flights array serialization, and 404 error response format.
+
 ## Build and run locally
 
 ```bash

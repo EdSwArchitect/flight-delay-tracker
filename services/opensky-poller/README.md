@@ -52,6 +52,14 @@ Polls the OpenSky Network REST API for live ADS-B aircraft position data and wri
 | `opensky.state_vectors.count` | Gauge | Number of state vectors written in the last poll |
 | `opensky.token.refresh.total{status}` | Counter | OAuth2 token refresh attempts by outcome |
 
+## Tests
+
+```bash
+mvn test -pl services/opensky-poller
+```
+
+12 tests covering StateVector record serialization/deserialization and OpenSky API response array parsing (null coordinates, blank callsigns, empty icao24).
+
 ## Build and run locally
 
 ```bash

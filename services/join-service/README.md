@@ -36,7 +36,8 @@ Merges OpenSky position data with AirLabs schedule and delay data using a 3-step
 
 | File | Description |
 |---|---|
-| `src/main/java/.../join/FlightJoinApp.java` | Main class: scheduler, scan loop, 3-step resolution algorithm, enriched record writes |
+| `src/main/java/.../join/FlightJoinApp.java` | Main class: scheduler, scan loop, enriched record writes |
+| `src/main/java/.../join/CallsignResolver.java` | Extracted 3-step callsign resolution logic (exact match, ICAO normalisation, fallback) |
 | `src/main/resources/application.properties` | Default configuration values |
 | `src/main/resources/logback.xml` | Logging configuration |
 | `Dockerfile` | Multi-stage Docker image (eclipse-temurin:21-jre-alpine) |
@@ -50,6 +51,14 @@ Merges OpenSky position data with AirLabs schedule and delay data using a 3-step
 | `flight.join.duration.seconds` | Histogram | Time taken per join cycle |
 | `flight.enriched.count` | Gauge | Number of enriched records written in the last cycle |
 | `flight.index.miss.reasons{reason}` | Counter | Resolution miss reasons (`blank_callsign`, `no_match`, `normalisation_miss`) |
+
+## Tests
+
+```bash
+mvn test -pl services/join-service
+```
+
+21 tests covering the `CallsignResolver` 3-step chain, all 10 ICAO-to-IATA prefix mappings, blank/null callsign handling, leading zero stripping, and `normaliseToIata` utility.
 
 ## Build and run locally
 
