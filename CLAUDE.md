@@ -58,7 +58,8 @@ flight-tracker/
 │       ├── postgres-values.yaml
 │       ├── ingress-values.yaml
 │       ├── kube-prometheus-values.yaml
-│       └── loki-values.yaml
+│       ├── loki-values.yaml
+│       └── alloy-values.yaml
 └── services/
     ├── opensky-poller/              ← Java 25, polls OpenSky positions
     ├── airlabs-poller/              ← Java 25, polls AirLabs delays + schedules
@@ -217,7 +218,7 @@ Pod annotations: `prometheus.io/scrape: "true"`, `prometheus.io/port: "{metricsP
 | `api` | api, ws-server |
 | `ui` | map-ui |
 | `data` | Redis (bitnami/redis), Postgres (bitnami/postgresql) |
-| `observability` | kube-prometheus-stack, loki-stack |
+| `observability` | kube-prometheus-stack, Loki, Alloy |
 | `ingress` | ingress-nginx |
 
 ---

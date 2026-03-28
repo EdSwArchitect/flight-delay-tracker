@@ -64,19 +64,26 @@ helm upgrade --install kube-prometheus prometheus-community/kube-prometheus-stac
   --values "$PROJECT_DIR/charts/deps/kube-prometheus-values.yaml" \
   --wait --timeout 180s || echo "Warning: prometheus install may need retry"
 
-# 9. Install Loki
+# 9. Install Loki (SingleBinary mode, filesystem storage)
 echo "Installing Loki..."
-helm upgrade --install loki grafana/loki-stack \
+helm upgrade --install loki grafana/loki \
   --namespace observability \
   --values "$PROJECT_DIR/charts/deps/loki-values.yaml" \
-  --wait --timeout 120s || echo "Warning: loki install may need retry"
+  --wait --timeout 180s || echo "Warning: loki install may need retry"
 
-# 10. Build Maven project
+# 10. Install Alloy (log collector, replaces deprecated Promtail)
+echo "Installing Alloy..."
+helm upgrade --install alloy grafana/alloy \
+  --namespace observability \
+  --values "$PROJECT_DIR/charts/deps/alloy-values.yaml" \
+  --wait --timeout 120s || echo "Warning: alloy install may need retry"
+
+# 11. Build Maven project
 echo "Building Maven project..."
 cd "$PROJECT_DIR"
 mvn clean package -DskipTests -q
 
-# 11. Build Docker images and load into Kind
+# 12. Build Docker images and load into Kind
 echo "Building Docker images..."
 SERVICES="opensky-poller airlabs-poller join-service api ws-server map-ui"
 for svc in $SERVICES; do
@@ -89,7 +96,7 @@ for svc in $SERVICES; do
   kind load docker-image "flight-tracker/${svc}:latest" --name "$CLUSTER_NAME"
 done
 
-# 12. Deploy with Skaffold
+# 13. Deploy with Skaffold
 echo "Starting Skaffold dev loop..."
 skaffold dev --profile=local --port-forward
 
