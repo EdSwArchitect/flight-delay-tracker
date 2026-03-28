@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ws-server.fullname" . }}
+  labels:
+    {{- include "ws-server.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    {{- if .Values.httpPort }}
+    - port: {{ .Values.httpPort }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    {{- end }}
+    {{- if .Values.metricsPort }}
+    - port: {{ .Values.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
+  selector:
+    {{- include "ws-server.selectorLabels" . | nindent 4 }}

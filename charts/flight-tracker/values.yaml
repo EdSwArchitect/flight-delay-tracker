@@ -1,0 +1,136 @@
+global:
+  imageRegistry: ""
+  imagePullPolicy: IfNotPresent
+
+redis:
+  host: redis-master.data.svc.cluster.local
+  port: 6379
+
+postgres:
+  host: postgresql.data.svc.cluster.local
+  port: 5432
+  database: flightdb
+  username: flightuser
+
+opensky-poller:
+  image:
+    repository: flight-tracker/opensky-poller
+    tag: latest
+  replicaCount: 1
+  metricsPort: 8081
+  pollIntervalSec: 15
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    REDIS_HOST: redis-master.data.svc.cluster.local
+    REDIS_PORT: "6379"
+    OPENSKY_POLL_INTERVAL_SEC: "15"
+    METRICS_PORT: "8081"
+
+airlabs-poller:
+  image:
+    repository: flight-tracker/airlabs-poller
+    tag: latest
+  replicaCount: 1
+  metricsPort: 8082
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    REDIS_HOST: redis-master.data.svc.cluster.local
+    REDIS_PORT: "6379"
+    POSTGRES_HOST: postgresql.data.svc.cluster.local
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: flightdb
+    POSTGRES_USER: flightuser
+    METRICS_PORT: "8082"
+    SCHEDULE_POLL_INTERVAL_SEC: "600"
+    DELAY_POLL_INTERVAL_SEC: "120"
+    DEP_AIRPORT: "BWI"
+
+join-service:
+  image:
+    repository: flight-tracker/join-service
+    tag: latest
+  replicaCount: 1
+  metricsPort: 8083
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    REDIS_HOST: redis-master.data.svc.cluster.local
+    REDIS_PORT: "6379"
+    METRICS_PORT: "8083"
+    JOIN_INTERVAL_SEC: "10"
+
+api:
+  image:
+    repository: flight-tracker/api
+    tag: latest
+  replicaCount: 1
+  httpPort: 8084
+  metricsPort: 8085
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    REDIS_HOST: redis-master.data.svc.cluster.local
+    REDIS_PORT: "6379"
+    POSTGRES_HOST: postgresql.data.svc.cluster.local
+    POSTGRES_PORT: "5432"
+    POSTGRES_DB: flightdb
+    POSTGRES_USER: flightuser
+    HTTP_PORT: "8084"
+    METRICS_PORT: "8085"
+
+ws-server:
+  image:
+    repository: flight-tracker/ws-server
+    tag: latest
+  replicaCount: 1
+  httpPort: 8086
+  metricsPort: 8087
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    REDIS_HOST: redis-master.data.svc.cluster.local
+    REDIS_PORT: "6379"
+    HTTP_PORT: "8086"
+    METRICS_PORT: "8087"
+    BROADCAST_INTERVAL_SEC: "5"
+
+map-ui:
+  image:
+    repository: flight-tracker/map-ui
+    tag: latest
+  replicaCount: 1
+  httpPort: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

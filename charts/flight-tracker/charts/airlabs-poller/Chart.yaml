@@ -1,0 +1,5 @@
+apiVersion: v2
+name: airlabs-poller
+description: airlabs-poller subchart
+type: application
+version: 0.1.0

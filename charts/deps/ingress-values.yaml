@@ -1,0 +1,17 @@
+controller:
+  kind: Deployment
+  hostPort:
+    enabled: true
+  service:
+    type: NodePort
+  watchIngressWithoutClass: true
+  nodeSelector:
+    ingress-ready: "true"
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+  publishService:
+    enabled: false
+  extraArgs:
+    publish-status-address: "localhost"

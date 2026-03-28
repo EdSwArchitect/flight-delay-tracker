@@ -1,0 +1,620 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flight-tracker-dashboards
+  namespace: observability
+  labels:
+    grafana_dashboard: "1"
+data:
+  flight-tracker-overview.json: |
+    {
+      "uid": "flight-tracker-overview",
+      "title": "Flight Tracker — Overview",
+      "schemaVersion": 39,
+      "version": 1,
+      "timezone": "browser",
+      "editable": true,
+      "time": { "from": "now-1h", "to": "now" },
+      "refresh": "10s",
+      "panels": [
+        {
+          "type": "row",
+          "title": "Ingestion",
+          "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+          "collapsed": false,
+          "id": 100
+        },
+        {
+          "id": 1,
+          "type": "gauge",
+          "title": "State Vectors",
+          "gridPos": { "x": 0, "y": 1, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 500 },
+                  { "color": "green", "value": 2000 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "expr": "opensky_state_vectors_count",
+              "legendFormat": "state vectors",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "OpenSky Poll Rate",
+          "gridPos": { "x": 6, "y": 1, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "rate(opensky_polls_total[5m])",
+              "legendFormat": "{{ "{{" }}status{{ "}}" }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "AirLabs Schedules / Delays",
+          "gridPos": { "x": 12, "y": 1, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "airlabs_schedules_count",
+              "legendFormat": "Schedules",
+              "refId": "A"
+            },
+            {
+              "expr": "airlabs_delays_count",
+              "legendFormat": "Delays",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "gauge",
+          "title": "Callsign Index Size",
+          "gridPos": { "x": 18, "y": 1, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 100 },
+                  { "color": "green", "value": 500 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "expr": "airlabs_index_size",
+              "legendFormat": "index entries",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "Join & Enrichment",
+          "gridPos": { "x": 0, "y": 7, "w": 24, "h": 1 },
+          "collapsed": false,
+          "id": 101
+        },
+        {
+          "id": 5,
+          "type": "gauge",
+          "title": "Enriched Flights",
+          "gridPos": { "x": 0, "y": 8, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 200 },
+                  { "color": "green", "value": 1000 }
+                ]
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          },
+          "targets": [
+            {
+              "expr": "flight_enriched_count",
+              "legendFormat": "enriched flights",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Join Results",
+          "gridPos": { "x": 6, "y": 8, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "rate(flight_joins_total[5m])",
+              "legendFormat": "{{ "{{" }}result{{ "}}" }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Join Duration p99",
+          "gridPos": { "x": 12, "y": 8, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 10,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, rate(flight_join_duration_seconds_bucket[5m]))",
+              "legendFormat": "p99",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "type": "piechart",
+          "title": "Index Miss Reasons",
+          "gridPos": { "x": 18, "y": 8, "w": 6, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "legend": { "displayMode": "list", "placement": "right" },
+            "pieType": "pie",
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "increase(flight_index_miss_reasons[1h])",
+              "legendFormat": "{{ "{{" }}reason{{ "}}" }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "WebSocket",
+          "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+          "collapsed": false,
+          "id": 102
+        },
+        {
+          "id": 9,
+          "type": "stat",
+          "title": "Active WS Sessions",
+          "gridPos": { "x": 0, "y": 15, "w": 8, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "red", "value": 100 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "colorMode": "value",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "ws_sessions_active",
+              "legendFormat": "active sessions",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "WS Session Events",
+          "gridPos": { "x": 8, "y": 15, "w": 8, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "rate(ws_sessions_total[5m])",
+              "legendFormat": "{{ "{{" }}event{{ "}}" }}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "Broadcasts/sec",
+          "gridPos": { "x": 16, "y": 15, "w": 8, "h": 6 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ops",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "rate(ws_broadcasts_total[5m])",
+              "legendFormat": "{{ "{{" }}type{{ "}}" }}",
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "templating": { "list": [] },
+      "annotations": { "list": [] }
+    }
+  flight-tracker-api.json: |
+    {
+      "uid": "flight-tracker-api",
+      "title": "Flight Tracker — API",
+      "schemaVersion": 39,
+      "version": 1,
+      "timezone": "browser",
+      "editable": true,
+      "time": { "from": "now-1h", "to": "now" },
+      "refresh": "10s",
+      "panels": [
+        {
+          "type": "row",
+          "title": "Traffic",
+          "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+          "collapsed": false,
+          "id": 200
+        },
+        {
+          "id": 20,
+          "type": "timeseries",
+          "title": "Request Rate",
+          "gridPos": { "x": 0, "y": 1, "w": 8, "h": 7 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total[5m]))",
+              "legendFormat": "total",
+              "refId": "A"
+            },
+            {
+              "expr": "sum by (path) (rate(http_requests_total[5m]))",
+              "legendFormat": "{{ "{{" }}path{{ "}}" }}",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "id": 21,
+          "type": "timeseries",
+          "title": "Error Rate (4xx/5xx)",
+          "gridPos": { "x": 8, "y": 1, "w": 8, "h": 7 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 15,
+                "pointSize": 5,
+                "showPoints": "auto"
+              },
+              "color": { "mode": "fixed", "fixedColor": "red" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(http_requests_total{status=~\"4..|5..\"}[5m]))",
+              "legendFormat": "errors",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "id": 22,
+          "type": "timeseries",
+          "title": "Request Duration p50/p95/p99",
+          "gridPos": { "x": 16, "y": 1, "w": 8, "h": 7 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "fillOpacity": 10,
+                "pointSize": 5,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi" }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+              "legendFormat": "p50",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+              "legendFormat": "p95",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+              "legendFormat": "p99",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "type": "row",
+          "title": "By Endpoint",
+          "gridPos": { "x": 0, "y": 8, "w": 24, "h": 1 },
+          "collapsed": false,
+          "id": 201
+        },
+        {
+          "id": 23,
+          "type": "barchart",
+          "title": "Requests by Path",
+          "gridPos": { "x": 0, "y": 9, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "fillOpacity": 80
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" },
+            "orientation": "horizontal",
+            "xTickLabelRotation": 0,
+            "barWidth": 0.8
+          },
+          "targets": [
+            {
+              "expr": "sum by (path) (increase(http_requests_total[1h]))",
+              "legendFormat": "{{ "{{" }}path{{ "}}" }}",
+              "refId": "A",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": { "Time": true },
+                "renameByName": { "Value": "Requests", "path": "Path" }
+              }
+            }
+          ]
+        },
+        {
+          "id": 24,
+          "type": "table",
+          "title": "Latency by Path p95",
+          "gridPos": { "x": 12, "y": 9, "w": 12, "h": 8 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "red", "value": 1.0 }
+                ]
+              },
+              "custom": {
+                "displayMode": "color-background"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "footer": { "show": false }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum by (le, path) (rate(http_request_duration_seconds_bucket[5m])))",
+              "legendFormat": "{{ "{{" }}path{{ "}}" }}",
+              "refId": "A",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": { "Time": true, "le": true },
+                "renameByName": { "Value": "p95 Latency", "path": "Path" }
+              }
+            }
+          ]
+        }
+      ],
+      "templating": { "list": [] },
+      "annotations": { "list": [] }
+    }

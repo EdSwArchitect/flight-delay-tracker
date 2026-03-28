@@ -1,0 +1,61 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: flight-tracker
+
+profiles:
+  - name: local
+    build:
+      local:
+        push: false
+      artifacts:
+        - image: flight-tracker/opensky-poller
+          context: services/opensky-poller
+          docker:
+            dockerfile: Dockerfile
+        - image: flight-tracker/airlabs-poller
+          context: services/airlabs-poller
+          docker:
+            dockerfile: Dockerfile
+        - image: flight-tracker/join-service
+          context: services/join-service
+          docker:
+            dockerfile: Dockerfile
+        - image: flight-tracker/api
+          context: services/api
+          docker:
+            dockerfile: Dockerfile
+        - image: flight-tracker/ws-server
+          context: services/ws-server
+          docker:
+            dockerfile: Dockerfile
+        - image: flight-tracker/map-ui
+          context: services/map-ui
+          docker:
+            dockerfile: Dockerfile
+    deploy:
+      helm:
+        releases:
+          - name: flight-tracker
+            chartPath: charts/flight-tracker
+            valuesFiles:
+              - charts/flight-tracker/values.yaml
+            namespace: default
+            setValues:
+              opensky-poller.image.tag: ""
+              airlabs-poller.image.tag: ""
+              join-service.image.tag: ""
+              api.image.tag: ""
+              ws-server.image.tag: ""
+              map-ui.image.tag: ""
+    portForward:
+      - resourceType: service
+        resourceName: api
+        namespace: default
+        port: 8084
+        localPort: 8084
+      - resourceType: service
+        resourceName: ws-server
+        namespace: default
+        port: 8086
+        localPort: 8086

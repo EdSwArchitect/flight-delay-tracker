@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ws-server
+description: ws-server subchart
+type: application
+version: 0.1.0

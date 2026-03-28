@@ -1,0 +1,7 @@
+apiVersion: v2
+name: flight-tracker
+description: Umbrella Helm chart for Flight Delay Tracker
+type: application
+version: 0.1.0
+appVersion: "0.1.0-SNAPSHOT"
+dependencies: []

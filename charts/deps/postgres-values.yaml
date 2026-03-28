@@ -1,0 +1,17 @@
+auth:
+  username: flightuser
+  password: flightpass
+  database: flightdb
+  existingSecret: ""
+primary:
+  persistence:
+    enabled: false
+  initdb:
+    scriptsConfigMap: postgres-init-schema
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

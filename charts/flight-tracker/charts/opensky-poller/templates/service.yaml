@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opensky-poller.fullname" . }}
+  labels:
+    {{- include "opensky-poller.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    {{- if .Values.metricsPort }}
+    - port: {{ .Values.metricsPort }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
+  selector:
+    {{- include "opensky-poller.selectorLabels" . | nindent 4 }}
