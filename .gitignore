@@ -39,3 +39,6 @@ scripts/secrets/
 # Plan documents
 flight-delay-tracker-prototype-plan.*
 generate-plan.js
+
+# API Keys
+airlabs-key.txt
