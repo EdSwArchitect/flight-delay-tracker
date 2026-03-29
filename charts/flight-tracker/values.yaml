@@ -29,7 +29,7 @@ opensky-poller:
   env:
     REDIS_HOST: redis-master.data.svc.cluster.local
     REDIS_PORT: "6379"
-    OPENSKY_POLL_INTERVAL_SEC: "15"
+    OPENSKY_POLL_INTERVAL_SEC: "30"
     METRICS_PORT: "8081"
 
 airlabs-poller:
@@ -56,6 +56,10 @@ airlabs-poller:
     SCHEDULE_POLL_INTERVAL_SEC: "600"
     DELAY_POLL_INTERVAL_SEC: "120"
     DEP_AIRPORT: "BWI"
+  secretKeyEnv:
+    - envName: AIRLABS_API_KEY
+      secretName: airlabs-credentials
+      key: api-key
 
 join-service:
   image:

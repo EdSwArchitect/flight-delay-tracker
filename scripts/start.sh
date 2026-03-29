@@ -22,7 +22,19 @@ for ns in ingestion api ui data observability ingress; do
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
 done
 
-# 3. Add Helm repos
+# 3. Create AirLabs API key secret from airlabs-key.txt
+AIRLABS_KEY_FILE="$PROJECT_DIR/airlabs-key.txt"
+if [ -f "$AIRLABS_KEY_FILE" ]; then
+  echo "Creating airlabs-credentials secret..."
+  kubectl create secret generic airlabs-credentials \
+    --namespace default \
+    --from-literal=api-key="$(cat "$AIRLABS_KEY_FILE")" \
+    --dry-run=client -o yaml | kubectl apply -f -
+else
+  echo "Warning: $AIRLABS_KEY_FILE not found — skipping airlabs-credentials secret"
+fi
+
+# 4. Add Helm repos
 echo "Adding Helm repositories..."
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>/dev/null || true
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true

@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class OpenSkyPollerApp {
 
@@ -61,6 +62,10 @@ public class OpenSkyPollerApp {
         Gauge.builder("opensky.state_vectors.count", stateVectorCount, AtomicInteger::get).register(registry);
     }
 
+    private static final long MAX_BACKOFF_SEC = 300; // 5 minute cap
+    private static final AtomicLong currentDelaySec = new AtomicLong(POLL_INTERVAL);
+    private static ScheduledExecutorService scheduler;
+
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
@@ -80,9 +85,9 @@ public class OpenSkyPollerApp {
         RedisCommands<String, String> redis = redisClient.connect().sync();
         log.info("Connected to Redis at {}:{}", REDIS_HOST, REDIS_PORT);
 
-        // Scheduler with virtual threads
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, Thread.ofVirtual().factory());
-        scheduler.scheduleAtFixedRate(() -> poll(redis), 0, POLL_INTERVAL, TimeUnit.SECONDS);
+        // Scheduler with virtual threads — single-shot scheduling for backoff support
+        scheduler = Executors.newScheduledThreadPool(1, Thread.ofVirtual().factory());
+        scheduleNext(redis, 0);
 
         Runtime.getRuntime().addShutdownHook(Thread.ofVirtual().unstarted(() -> {
             log.info("Shutting down...");
@@ -90,6 +95,24 @@ public class OpenSkyPollerApp {
             redisClient.shutdown();
             metricsApp.stop();
         }));
+    }
+
+    private static void scheduleNext(RedisCommands<String, String> redis, long delaySec) {
+        scheduler.schedule(() -> {
+            poll(redis);
+            scheduleNext(redis, currentDelaySec.get());
+        }, delaySec, TimeUnit.SECONDS);
+    }
+
+    private static void backoff() {
+        long current = currentDelaySec.get();
+        long next = Math.min(current * 2, MAX_BACKOFF_SEC);
+        currentDelaySec.set(next);
+        log.warn("Backing off — next poll in {}s", next);
+    }
+
+    private static void resetBackoff() {
+        currentDelaySec.set(POLL_INTERVAL);
     }
 
     private static void poll(RedisCommands<String, String> redis) {
@@ -108,9 +131,17 @@ public class OpenSkyPollerApp {
 
             HttpResponse<String> response = httpClient.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
 
+            if (response.statusCode() == 429) {
+                log.warn("OpenSky API returned 429 (rate limited)");
+                pollsFailure.increment();
+                backoff();
+                return;
+            }
+
             if (response.statusCode() != 200) {
                 log.warn("OpenSky API returned status {}", response.statusCode());
                 pollsFailure.increment();
+                backoff();
                 return;
             }
 
@@ -144,11 +175,13 @@ public class OpenSkyPollerApp {
 
             stateVectorCount.set(count);
             pollsSuccess.increment();
+            resetBackoff();
             log.info("Polled {} state vectors from OpenSky", count);
 
         } catch (Exception e) {
             log.error("Poll failed", e);
             pollsFailure.increment();
+            backoff();
         } finally {
             sample.stop(pollDuration);
         }

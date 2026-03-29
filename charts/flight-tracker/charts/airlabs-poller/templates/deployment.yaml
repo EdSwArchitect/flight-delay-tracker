@@ -31,13 +31,13 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-          {{- if .Values.secretEnv }}
-          envFrom:
-            {{- range .Values.secretEnv }}
-            - secretRef:
-                name: {{ .secretName }}
+            {{- range .Values.secretKeyEnv | default list }}
+            - name: {{ .envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .secretName }}
+                  key: {{ .key }}
             {{- end }}
-          {{- end }}
           livenessProbe:
             httpGet:
               path: /metrics

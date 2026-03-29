@@ -53,15 +53,16 @@ cd flight-delay-tracker
 
 ### 2. Create Kubernetes secrets
 
-These secrets are never committed to Git. Create them after the cluster is running (start.sh creates the namespaces first, or create them manually):
+These secrets are never committed to Git.
+
+**AirLabs API key** — place your key in a file called `airlabs-key.txt` in the project root (already in `.gitignore`). The `start.sh` script reads this file and creates the `airlabs-credentials` secret automatically.
+
+**OpenSky and Postgres** — create these manually after the cluster is running:
 
 ```bash
-kubectl create secret generic opensky-credentials --namespace ingestion \
+kubectl create secret generic opensky-credentials --namespace default \
   --from-literal=client-id=<your-client-id> \
   --from-literal=client-secret=<your-client-secret>
-
-kubectl create secret generic airlabs-credentials --namespace ingestion \
-  --from-literal=api-key=<your-api-key>
 
 kubectl create secret generic postgres-credentials --namespace data \
   --from-literal=password=flightpass
@@ -131,7 +132,7 @@ flight-delay-tracker/
 |---|---|---|---|
 | `OPENSKY_CLIENT_ID` | opensky-poller | (secret) | OpenSky Network OAuth2 client ID |
 | `OPENSKY_CLIENT_SECRET` | opensky-poller | (secret) | OpenSky Network OAuth2 client secret |
-| `OPENSKY_POLL_INTERVAL_SEC` | opensky-poller | 15 | Seconds between OpenSky polls |
+| `OPENSKY_POLL_INTERVAL_SEC` | opensky-poller | 30 | Seconds between OpenSky polls (backs off exponentially on 429) |
 | `AIRLABS_API_KEY` | airlabs-poller | (secret) | AirLabs Data API key |
 | `DEP_AIRPORT` | airlabs-poller | BWI | IATA code for departure airport filter |
 | `AIRLABS_SCHEDULE_INTERVAL_SEC` | airlabs-poller | 600 | Seconds between schedule polls |

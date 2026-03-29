@@ -155,7 +155,7 @@ public class AirLabsPollerApp {
                     Integer delayedMin = flight.has("delayed") && !flight.get("delayed").isNull()
                             ? flight.get("delayed").asInt() : null;
 
-                    if (depTime == null) continue;
+                    if (depTime == null || parseTimestamp(depTime) == null) continue;
 
                     // Upsert to Postgres
                     upsertSchedule(ds, flightIata, depIata, arrIata, depTime, arrTime,
@@ -191,7 +191,7 @@ public class AirLabsPollerApp {
 
     private static void pollDelays(RedisCommands<String, String> redis, HikariDataSource ds) {
         try {
-            String url = AIRLABS_BASE_URL + "/delays?dep_iata=" + DEP_AIRPORT + "&api_key=" + AIRLABS_API_KEY;
+            String url = AIRLABS_BASE_URL + "/delays?type=departures&dep_iata=" + DEP_AIRPORT + "&api_key=" + AIRLABS_API_KEY;
             String body = fetch(url);
             if (body == null) { pollsDelayFailure.increment(); return; }
 

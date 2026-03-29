@@ -5,7 +5,8 @@ Polls the OpenSky Network REST API for live ADS-B aircraft position data and wri
 ## What it does
 
 - Authenticates with OpenSky Network using OAuth2 client credentials flow (optional -- falls back to unauthenticated access)
-- Polls `GET /api/states/all` on a configurable interval (default 15 seconds)
+- Polls `GET /api/states/all` on a configurable interval (default 30 seconds)
+- Uses exponential backoff on HTTP 429 (rate limit) or other failures -- doubles the delay each time up to a 5-minute cap, resets to the base interval on success
 - Parses each state vector into a `StateVector` record (icao24, callsign, lon, lat, altitude, onGround, velocity, heading)
 - Writes each position to Redis key `flight:position:{icao24}` with a 60-second TTL
 - Refreshes the OAuth2 bearer token automatically 30 seconds before expiry
@@ -17,7 +18,7 @@ Polls the OpenSky Network REST API for live ADS-B aircraft position data and wri
 | `REDIS_HOST` | `localhost` | Redis hostname |
 | `REDIS_PORT` | `6379` | Redis port |
 | `METRICS_PORT` | `8081` | Port for the Prometheus `/metrics` endpoint |
-| `OPENSKY_POLL_INTERVAL_SEC` | `15` | Seconds between polls (keep at 15 to stay within 8000 credits/day) |
+| `OPENSKY_POLL_INTERVAL_SEC` | `30` | Base seconds between polls (exponential backoff on 429, capped at 300s) |
 | `OPENSKY_CLIENT_ID` | _(empty)_ | OpenSky OAuth2 client ID (optional -- polls without auth if blank) |
 | `OPENSKY_CLIENT_SECRET` | _(empty)_ | OpenSky OAuth2 client secret |
 
