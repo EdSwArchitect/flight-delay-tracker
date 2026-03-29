@@ -18,7 +18,7 @@ Do not delete it. Update it as the implementation evolves.
 ## What this project is
 
 A real-time flight tracking prototype that:
-1. Polls **OpenSky Network** for live ADS-B aircraft positions every 10–15 seconds
+1. Polls **OpenSky Network** for live ADS-B aircraft positions every 30 seconds (with exponential backoff on rate limiting)
 2. Polls **AirLabs Data API** for flight schedules (every 10 min) and delays (every 2 min)
 3. Joins position data to schedule data via callsign normalisation
 4. Persists hot state in Redis, history in Postgres
@@ -34,6 +34,7 @@ A real-time flight tracking prototype that:
 ```
 flight-tracker/
 ├── CLAUDE.md                        ← you are here
+├── airlabs-key.txt                  ← AirLabs API key (in .gitignore, read by start.sh)
 ├── pom.xml                          ← Maven parent POM
 ├── skaffold.yaml
 ├── scripts/
@@ -90,7 +91,7 @@ flight-tracker/
 
 | Concern | Decision | Reason |
 |---|---|---|
-| Scheduling | Java ScheduledExecutorService (virtual thread factory) | No Python/Celery — single language backend |
+| Scheduling | Java ScheduledExecutorService (virtual thread factory) with exponential backoff | No Python/Celery — single language backend; backoff on 429s |
 | REST framework | Javalin 6 with virtual threads | Minimal, explicit, fast Skaffold loop |
 | Metrics | Micrometer + Prometheus registry | /metrics endpoint, compatible with kube-prometheus-stack |
 | Redis client | Lettuce (async) | Non-blocking, works naturally with virtual threads |
@@ -216,11 +217,11 @@ Pod annotations: `prometheus.io/scrape: "true"`, `prometheus.io/port: "{metricsP
 
 ## Kubernetes namespaces
 
+**Note:** Skaffold deploys all application services to the `default` namespace (see `skaffold.yaml` line 43). The namespaces below are used for infrastructure dependencies only.
+
 | Namespace | Contents |
 |---|---|
-| `ingestion` | opensky-poller, airlabs-poller, join-service |
-| `api` | api, ws-server |
-| `ui` | map-ui |
+| `default` | opensky-poller, airlabs-poller, join-service, api, ws-server, map-ui (via Skaffold Helm release) |
 | `data` | Redis (bitnami/redis), Postgres (bitnami/postgresql) |
 | `observability` | kube-prometheus-stack, Loki, Alloy |
 | `ingress` | ingress-nginx |
@@ -238,15 +239,17 @@ Pod annotations: `prometheus.io/scrape: "true"`, `prometheus.io/port: "{metricsP
 
 ---
 
-## Kubernetes secrets (created manually — never committed to Git)
+## Kubernetes secrets (never committed to Git)
+
+**AirLabs** — auto-created by `start.sh` from `airlabs-key.txt` in the project root (file is in `.gitignore`).
+The Helm deployment wires the secret via `secretKeyRef` (secret key `api-key` → env var `AIRLABS_API_KEY`).
+
+**OpenSky and Postgres** — created manually:
 
 ```bash
-kubectl create secret generic opensky-credentials --namespace ingestion \
+kubectl create secret generic opensky-credentials --namespace default \
   --from-literal=client-id=<your-client-id> \
   --from-literal=client-secret=<your-client-secret>
-
-kubectl create secret generic airlabs-credentials --namespace ingestion \
-  --from-literal=api-key=<your-api-key>
 
 kubectl create secret generic postgres-credentials --namespace data \
   --from-literal=password=flightpass
@@ -313,12 +316,12 @@ mvn test
 # Validate deployment
 bash k8s/validation-runbook.sh
 
-# Tail logs
-kubectl logs -n ingestion -l app=opensky-poller -f
-kubectl logs -n ingestion -l app=airlabs-poller -f
-kubectl logs -n ingestion -l app=join-service -f
-kubectl logs -n api -l app=api -f
-kubectl logs -n api -l app=ws-server -f
+# Tail logs (all app services in default namespace)
+kubectl logs -n default -l app=opensky-poller -f
+kubectl logs -n default -l app=airlabs-poller -f
+kubectl logs -n default -l app=join-service -f
+kubectl logs -n default -l app=api -f
+kubectl logs -n default -l app=ws-server -f
 
 # Check all pods
 kubectl get pods -A
@@ -373,4 +376,10 @@ Add dated notes here as implementation decisions are made.
 # 2026-03-28: Extracted CallsignResolver from FlightJoinApp for unit testability
 # 2026-03-28: Added 50 JUnit 5 tests across all 5 Java services
 # 2026-03-28: Postgres init schema ConfigMap must be created before Helm install (not after)
+# 2026-03-28: OpenSky poll interval increased from 15s to 30s default; exponential backoff on 429 (doubles up to 300s cap, resets on success)
+# 2026-03-28: AirLabs /delays endpoint requires type=departures parameter
+# 2026-03-28: AirLabs poller skips schedule entries with null/unparseable dep_time
+# 2026-03-28: airlabs-credentials secret auto-created by start.sh from airlabs-key.txt (in .gitignore)
+# 2026-03-28: Skaffold deploys all app services to default namespace (not per-service namespaces) — secrets must be in default
+# 2026-03-28: airlabs-poller Helm template uses secretKeyRef (not envFrom/secretRef) to map secret key api-key → env AIRLABS_API_KEY
 ```
