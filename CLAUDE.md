@@ -290,7 +290,7 @@ kubectl create secret generic postgres-credentials --namespace data \
 - **Tile source:** MapTiler free tier (VITE_MAPTILER_KEY env var)
 - **WebSocket:** connects to `/ws/positions`, handles snapshot/delta/heartbeat envelopes
 - **Delay colours:** null→grey `[136,135,128]`, ≤0→green `[57,158,117]`, 1-30→amber `[239,159,39]`, 31-60→orange `[216,90,48]`, >60→red `[226,75,74]`
-- **Click:** opens FlightDetailPanel, fetches GET /api/flights/{icao24}
+- **Click:** opens FlightPopup at click location using local WebSocket data (no API fetch). Shows route, delay badge, altitude (ft), speed (kts), heading, schedule times, resolution type. Border color matches delay tier. Dismisses on map click or close button.
 
 ---
 
@@ -382,4 +382,7 @@ Add dated notes here as implementation decisions are made.
 # 2026-03-28: airlabs-credentials secret auto-created by start.sh from airlabs-key.txt (in .gitignore)
 # 2026-03-28: Skaffold deploys all app services to default namespace (not per-service namespaces) — secrets must be in default
 # 2026-03-28: airlabs-poller Helm template uses secretKeyRef (not envFrom/secretRef) to map secret key api-key → env AIRLABS_API_KEY
+# 2026-03-29: Fixed AirLabs timestamp parsing — API returns "yyyy-MM-dd HH:mm" (no seconds), added LocalDateTime fallback in parseTimestamp()
+# 2026-03-29: callsign:index was empty (0 schedules indexed) because all dep_time values failed parsing — fix restored schedule ingestion
+# 2026-03-29: Replaced FlightDetailPanel (fixed side panel, API fetch) with FlightPopup (positioned at click location, uses local WebSocket data)
 ```

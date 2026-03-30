@@ -11,6 +11,7 @@ Polls the AirLabs Data API for flight schedules and delay information, builds a 
 - Writes delay data to Redis keys `flight:delay:{flight_iata}` with a 300-second TTL
 - Archives every raw API response into the Postgres `raw_api_responses` table as JSONB
 - Skips schedule entries with missing or unparseable `dep_time` to avoid Postgres NOT NULL constraint violations
+- Handles AirLabs timestamp formats including `yyyy-MM-dd HH:mm` (no seconds) via multi-step parsing fallback
 - Degrades gracefully when `AIRLABS_API_KEY` is missing -- metrics server stays running for liveness probes, polling is disabled
 - API key secret is auto-created by `start.sh` from `airlabs-key.txt` in the project root (file is in `.gitignore`)
 

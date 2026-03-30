@@ -10,7 +10,7 @@ Real-time flight tracking prototype that joins ADS-B position data with airline 
 - **Polls AirLabs Data API** for flight schedules (every 10 min) and active delays (every 2 min), upserting to Postgres and Redis
 - **Joins position and schedule data** via a 3-step callsign normalisation algorithm (ICAO-to-IATA prefix mapping)
 - **Serves enriched flight data** through a REST API and real-time WebSocket broadcast
-- **Renders a live flight map** in the browser using React, MapLibre GL JS, and Deck.gl with colour-coded delay indicators
+- **Renders a live flight map** in the browser using React, MapLibre GL JS, and Deck.gl with colour-coded delay indicators and click-to-inspect flight popups
 - **Exposes operational metrics** to Prometheus and Grafana for monitoring poll rates, join quality, and WebSocket sessions
 
 ## Tech Stack
@@ -26,7 +26,7 @@ Real-time flight tracking prototype that joins ADS-B position data with airline 
 
 ## Architecture Overview
 
-The system is organised as a microservices pipeline running across 6 Kubernetes namespaces (`ingestion`, `api`, `ui`, `data`, `observability`, `ingress`). Data flows from two external APIs through ingestion pollers, into a join service that enriches positions with schedule and delay information, then out to clients via REST and WebSocket endpoints.
+The system is organised as a microservices pipeline. Application services deploy to the `default` namespace via Skaffold, with infrastructure in dedicated namespaces (`data`, `observability`, `ingress`). Data flows from two external APIs through ingestion pollers, into a join service that enriches positions with schedule and delay information, then out to clients via REST and WebSocket endpoints.
 
 For a detailed breakdown of each service, the domain model, join algorithm, data store schemas, and Kubernetes topology, see [docs/architecture.md](docs/architecture.md).
 
@@ -117,12 +117,12 @@ flight-delay-tracker/
 
 | Service | Description | Port(s) | Namespace |
 |---|---|---|---|
-| opensky-poller | Polls OpenSky Network API for live ADS-B state vectors, writes to Redis | 8081 (metrics) | ingestion |
-| airlabs-poller | Polls AirLabs API for flight schedules and delays, writes to Redis and Postgres | 8082 (metrics) | ingestion |
-| join-service | Joins position and schedule data via callsign normalisation, writes enriched records to Redis | 8083 (metrics) | ingestion |
-| api | REST API serving enriched flight data and delay information | 8084 (HTTP), 8085 (metrics) | api |
-| ws-server | WebSocket server broadcasting real-time position updates to connected clients | 8086 (WS), 8087 (metrics) | api |
-| map-ui | React SPA rendering flights on an interactive map with delay colour coding | 80 (HTTP) | ui |
+| opensky-poller | Polls OpenSky Network API for live ADS-B state vectors, writes to Redis | 8081 (metrics) | default |
+| airlabs-poller | Polls AirLabs API for flight schedules and delays, writes to Redis and Postgres | 8082 (metrics) | default |
+| join-service | Joins position and schedule data via callsign normalisation, writes enriched records to Redis | 8083 (metrics) | default |
+| api | REST API serving enriched flight data and delay information | 8084 (HTTP), 8085 (metrics) | default |
+| ws-server | WebSocket server broadcasting real-time position updates to connected clients | 8086 (WS), 8087 (metrics) | default |
+| map-ui | React SPA rendering flights on an interactive map with delay colour coding and click-to-inspect popups | 80 (HTTP) | default |
 
 ## Configuration
 
@@ -182,11 +182,11 @@ skaffold build --profile=local
 ### Tail service logs
 
 ```bash
-kubectl logs -n ingestion -l app=opensky-poller -f
-kubectl logs -n ingestion -l app=airlabs-poller -f
-kubectl logs -n ingestion -l app=join-service -f
-kubectl logs -n api -l app=api -f
-kubectl logs -n api -l app=ws-server -f
+kubectl logs -n default -l app=opensky-poller -f
+kubectl logs -n default -l app=airlabs-poller -f
+kubectl logs -n default -l app=join-service -f
+kubectl logs -n default -l app=api -f
+kubectl logs -n default -l app=ws-server -f
 ```
 
 ### Check pod status

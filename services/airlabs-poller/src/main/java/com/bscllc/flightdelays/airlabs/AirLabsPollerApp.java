@@ -27,6 +27,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -311,7 +312,12 @@ public class AirLabsPollerApp {
             try {
                 return Timestamp.valueOf(value);
             } catch (Exception e2) {
-                return null;
+                // AirLabs returns "yyyy-MM-dd HH:mm" (no seconds) — parse as LocalDateTime
+                try {
+                    return Timestamp.valueOf(LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+                } catch (Exception e3) {
+                    return null;
+                }
             }
         }
     }

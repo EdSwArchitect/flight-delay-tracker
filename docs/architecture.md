@@ -53,7 +53,7 @@ OpenSky Network API              AirLabs API
 
 **Dependencies:** Redis (write), OpenSky Network API (external)
 
-**Scheduling:** Polls every 10-15 seconds (configurable via `OPENSKY_POLL_INTERVAL_SEC`, default 15). Uses `ScheduledExecutorService` with a virtual thread factory. Includes OAuth2 token refresh logic for authenticated access to OpenSky.
+**Scheduling:** Polls every 30 seconds by default (configurable via `OPENSKY_POLL_INTERVAL_SEC`). Uses single-shot `schedule()` calls with dynamic delay for exponential backoff: on HTTP 429 or failure, the interval doubles (30s -> 60s -> 120s -> 240s -> 300s cap); on success, it resets to the base interval. Uses `ScheduledExecutorService` with a virtual thread factory. Includes OAuth2 token refresh logic for authenticated access to OpenSky.
 
 **Redis writes:** `flight:position:{icao24}` with 60-second TTL for each state vector.
 
@@ -79,6 +79,8 @@ OpenSky Network API              AirLabs API
 - `flight:delay:{flight_iata}` -- delay minutes per flight, TTL 300s
 
 **Postgres writes:** Upserts into `flight_schedules` table. Archives raw API responses to `raw_api_responses` table.
+
+**Timestamp handling:** AirLabs returns timestamps in multiple formats including `yyyy-MM-dd HH:mm` (no seconds) and ISO offset. The `parseTimestamp()` method uses a 3-step fallback chain: ISO offset date-time, `Timestamp.valueOf()` (with seconds), and `LocalDateTime` parse (without seconds). Schedule entries with unparseable `dep_time` are skipped.
 
 ---
 
@@ -136,18 +138,20 @@ OpenSky Network API              AirLabs API
 
 ### map-ui
 
-**Purpose:** Browser-based React SPA that renders live flight positions on an interactive map. Connects to the WebSocket server for real-time updates and to the REST API for flight detail on click.
+**Purpose:** Browser-based React SPA that renders live flight positions on an interactive map. Connects to the WebSocket server for real-time updates and displays flight detail popups using locally cached data.
 
 **Key files:**
 - `services/map-ui/src/App.tsx` -- main application component
 - `services/map-ui/src/hooks/useFlightWebSocket.ts` -- WebSocket connection hook
-- `services/map-ui/src/components/FlightDetailPanel.tsx` -- flight detail sidebar
+- `services/map-ui/src/components/FlightDetailPanel.tsx` -- flight info popup positioned at clicked dot
 - `services/map-ui/src/components/DelayLegend.tsx` -- delay colour legend
 - `services/map-ui/src/utils/delayColor.ts` -- delay-to-colour mapping
 
 **Ports:** 80 (HTTP, served by Nginx)
 
-**Dependencies:** ws-server (WebSocket), api (REST)
+**Dependencies:** ws-server (WebSocket)
+
+**Click interaction:** Clicking a flight dot opens a `FlightPopup` positioned at the click location. The popup uses locally cached WebSocket data (no API round-trip) and displays: flight IATA / callsign header, route bar (DEP --- ARR), colour-coded delay badge, altitude (ft), speed (kts), heading, departure/arrival times, estimated times, and resolution type. The popup border colour matches the flight's delay tier. Clicking the map or the close button dismisses it.
 
 **Delay colour coding:**
 | Delay | Colour | RGB |
@@ -289,13 +293,11 @@ CREATE TABLE raw_api_responses (
 
 ### Namespace Layout
 
-The cluster is divided into 6 namespaces to isolate concerns:
+Skaffold deploys all application services to the `default` namespace. Infrastructure dependencies use dedicated namespaces:
 
 | Namespace | Contents | Purpose |
 |---|---|---|
-| `ingestion` | opensky-poller, airlabs-poller, join-service | Data ingestion and enrichment pipeline |
-| `api` | api, ws-server | Client-facing data services |
-| `ui` | map-ui | Frontend application |
+| `default` | opensky-poller, airlabs-poller, join-service, api, ws-server, map-ui | All application services (deployed via Skaffold Helm release) |
 | `data` | Redis (bitnami/redis), PostgreSQL (bitnami/postgresql) | Data store infrastructure |
 | `observability` | kube-prometheus-stack, Loki, Alloy | Monitoring and log aggregation |
 | `ingress` | ingress-nginx | External traffic routing |
@@ -386,13 +388,13 @@ Loki is deployed in the `observability` namespace alongside Prometheus. It colle
 
 ### Secrets Management
 
-All API credentials and database passwords are stored as Kubernetes secrets, created manually and never committed to the repository:
+All API credentials and database passwords are stored as Kubernetes secrets, never committed to the repository:
 
-- `opensky-credentials` (namespace: ingestion) -- OpenSky OAuth2 client ID and secret
-- `airlabs-credentials` (namespace: ingestion) -- AirLabs API key
-- `postgres-credentials` (namespace: data) -- PostgreSQL password
+- `opensky-credentials` (namespace: default) -- OpenSky OAuth2 client ID and secret (created manually)
+- `airlabs-credentials` (namespace: default) -- AirLabs API key (auto-created by `start.sh` from `airlabs-key.txt` in the project root, which is in `.gitignore`)
+- `postgres-credentials` (namespace: data) -- PostgreSQL password (created manually)
 
-Secrets are mounted as environment variables in the relevant pod specifications.
+Secrets are mounted as environment variables via `secretKeyRef` in the relevant pod specifications. The airlabs-poller maps secret key `api-key` to env var `AIRLABS_API_KEY`.
 
 ### Local Development Security Posture
 
@@ -411,13 +413,14 @@ These settings are not suitable for production deployment.
 The `start.sh` script orchestrates the full cluster bootstrap:
 
 1. **Create Kind cluster** -- using `k8s/kind-config.yaml`, which maps host port 8080 to the ingress controller
-2. **Create namespaces** -- `ingestion`, `api`, `ui`, `data`, `observability`, `ingress`
+2. **Create namespaces** -- `data`, `observability`, `ingress` (application services deploy to `default`)
 3. **Install Helm dependencies** -- Redis, PostgreSQL, ingress-nginx, kube-prometheus-stack, Loki, and Alloy using value overrides from `charts/deps/`
-4. **Apply database schema** -- runs `k8s/schema.sql` against the PostgreSQL instance to create the 4 tables
-5. **Build Java services** -- `mvn clean package -DskipTests` from the project root
-6. **Build Docker images** -- Skaffold builds images for all 6 services using their respective Dockerfiles
-7. **Load images into Kind** -- images are loaded directly into the Kind node (no registry needed)
-8. **Deploy via Skaffold** -- installs the umbrella Helm chart (`charts/flight-tracker/`) which deploys all services to their respective namespaces
-9. **Enable port forwarding** -- Skaffold forwards local ports to the cluster for development access
+4. **Apply database schema** -- creates a ConfigMap from `k8s/schema.sql` before Helm install (must be created before PostgreSQL starts, as the Bitnami chart runs init scripts on first boot)
+5. **Create secrets** -- auto-creates `airlabs-credentials` in the `default` namespace from `airlabs-key.txt`
+6. **Build Java services** -- `mvn clean package -DskipTests` from the project root
+7. **Build Docker images** -- Skaffold builds images for all 6 services using their respective Dockerfiles
+8. **Load images into Kind** -- images are loaded directly into the Kind node (no registry needed)
+9. **Deploy via Skaffold** -- installs the umbrella Helm chart (`charts/flight-tracker/`) which deploys all application services to the `default` namespace
+10. **Enable port forwarding** -- Skaffold forwards local ports to the cluster for development access
 
 The `stop.sh` script tears down the Kind cluster, removing all resources.

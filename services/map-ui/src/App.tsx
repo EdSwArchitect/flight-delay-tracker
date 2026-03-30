@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import Map from 'react-map-gl/maplibre';
 import { DeckGL } from '@deck.gl/react';
 import { ScatterplotLayer } from '@deck.gl/layers';
 import { useFlightWebSocket } from './hooks/useFlightWebSocket';
 import { getDelayColor } from './utils/delayColor';
 import { DelayLegend } from './components/DelayLegend';
-import { FlightDetailPanel } from './components/FlightDetailPanel';
+import { FlightPopup } from './components/FlightDetailPanel';
 import type { EnrichedFlight } from './types';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -22,9 +22,15 @@ const INITIAL_VIEW = {
   bearing: 0,
 };
 
+interface PickedFlight {
+  flight: EnrichedFlight;
+  x: number;
+  y: number;
+}
+
 export default function App() {
   const { flights, connected } = useFlightWebSocket();
-  const [selected, setSelected] = useState<string | null>(null);
+  const [picked, setPicked] = useState<PickedFlight | null>(null);
 
   const layer = new ScatterplotLayer<EnrichedFlight>({
     id: 'flights',
@@ -40,7 +46,7 @@ export default function App() {
     radiusMaxPixels: 8,
     onClick: (info) => {
       if (info.object) {
-        setSelected(info.object.icao24);
+        setPicked({ flight: info.object, x: info.x, y: info.y });
       }
     },
   });
@@ -51,6 +57,9 @@ export default function App() {
         initialViewState={INITIAL_VIEW}
         controller={true}
         layers={[layer]}
+        onClick={(info) => {
+          if (!info.object) setPicked(null);
+        }}
       >
         <Map mapStyle={MAP_STYLE} />
       </DeckGL>
@@ -67,8 +76,13 @@ export default function App() {
 
       <DelayLegend />
 
-      {selected && (
-        <FlightDetailPanel icao24={selected} onClose={() => setSelected(null)} />
+      {picked && (
+        <FlightPopup
+          flight={picked.flight}
+          x={picked.x}
+          y={picked.y}
+          onClose={() => setPicked(null)}
+        />
       )}
     </div>
   );

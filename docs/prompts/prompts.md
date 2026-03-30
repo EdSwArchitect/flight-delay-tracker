@@ -98,3 +98,47 @@ Prompts used with Claude Code during development of the Flight Delay Tracker pro
 > how do i redeploy
 
 **Result:** Provided `skaffold dev --profile=local --port-forward` command for redeploying after changes.
+
+---
+
+## UI Enhancements
+
+### Add flight info popup on click
+
+> update map ui so that when the user clicks on a dot for a flight, it pops up flight information available
+
+**Result:** Replaced the fixed-position `FlightDetailPanel` (which fetched from the REST API) with a new `FlightPopup` component that:
+- Positions at the click location next to the flight dot (flips left if near viewport edge)
+- Uses locally cached WebSocket data instead of an API call (instant, no network round-trip)
+- Shows: flight IATA / callsign header, route bar (DEP --- ARR), color-coded delay badge, 2-column grid with altitude (ft), speed (kts), heading, departure/arrival times, estimated times, and resolution type
+- Border color matches the flight's delay tier for visual association
+- Dismisses on map click or close button
+
+---
+
+## Bug Fixes (cont.)
+
+### Fix AirLabs timestamp parsing (callsign:index empty)
+
+> what is in redis / why is it missing
+
+**Context:** Redis had ~8k `flight:position:*` and ~8k `flight:enriched:*` keys, but `callsign:index` was missing. All enriched flights were `position_only` — no schedule resolution. Logs showed `Polled 0 schedules, indexed 0 callsigns` despite AirLabs returning 139 schedules in a 93KB response.
+
+**Root cause:** AirLabs returns timestamps like `"2026-03-29 17:40"` (no seconds). `parseTimestamp()` tried `ISO_OFFSET_DATE_TIME` (needs timezone offset — fails) then `Timestamp.valueOf()` (needs seconds — fails). Every schedule entry was skipped at the `parseTimestamp(depTime) == null` guard.
+
+**Result:** Added a third fallback in `parseTimestamp()` using `LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))`. Schedule ingestion and callsign index now populate correctly.
+
+---
+
+## Documentation (cont.)
+
+### Update READMEs, CLAUDE.md, and prompts
+
+> update necessary readmes / update CLAUDE.md / add prompts to prompts doc
+
+**Result:** Updated 4 files:
+- `README.md` (root): Fixed namespace references from per-service to `default`, added click-to-inspect mention, corrected `kubectl logs` namespaces.
+- `services/map-ui/README.md`: Updated click behavior description, dependency notes, and key files table for FlightPopup.
+- `services/airlabs-poller/README.md`: Added multi-format timestamp parsing note.
+- `CLAUDE.md`: Updated map-ui click behavior, added 3 decision log entries for timestamp fix, callsign:index root cause, and popup replacement.
+- `docs/prompts/prompts.md`: Added entries for flight popup, timestamp parsing bug, and documentation updates.

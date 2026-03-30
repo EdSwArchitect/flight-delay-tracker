@@ -9,7 +9,7 @@ React single-page application that renders a real-time flight map using MapLibre
 - Color-codes each flight dot by delay severity: grey (unknown), green (on time), amber (1-30 min), orange (31-60 min), red (>60 min)
 - Displays a connection status indicator (live flight count or disconnected state)
 - Shows a delay color legend overlay
-- Opens a FlightDetailPanel on click, fetching full flight details from `GET /api/flights/{icao24}`
+- Pops up a flight info panel on click, positioned at the clicked dot, showing route, delay status, altitude, speed, heading, and schedule times using locally cached WebSocket data (no API call)
 - Auto-reconnects the WebSocket after 3 seconds on disconnect
 
 ## Delay color tiers
@@ -38,7 +38,7 @@ React single-page application that renders a real-time flight map using MapLibre
 ## Dependencies
 
 - **ws-server** -- WebSocket connection at `/ws/positions` for live flight data
-- **api** -- REST call to `GET /api/flights/{icao24}` for flight detail panel
+- **api** -- REST API (used by other consumers; the flight popup uses local WebSocket data)
 - **MapTiler** -- tile server for dark basemap (optional, falls back to demo tiles)
 
 ## Key files
@@ -50,7 +50,7 @@ React single-page application that renders a real-time flight map using MapLibre
 | `src/types.ts` | TypeScript interfaces: EnrichedFlight, FlightPosition, FlightSchedule, FlightDelay, WsMessage |
 | `src/hooks/useFlightWebSocket.ts` | WebSocket hook: connect, parse snapshot/delta, auto-reconnect on close |
 | `src/components/DelayLegend.tsx` | Delay color legend overlay (5-tier) |
-| `src/components/FlightDetailPanel.tsx` | Side panel showing flight details fetched from REST API on click |
+| `src/components/FlightDetailPanel.tsx` | Popup positioned at clicked dot showing flight info (route, delay, altitude, speed, schedule times) from local data |
 | `src/utils/delayColor.ts` | Maps delay minutes to RGB color tuples |
 | `vite.config.ts` | Vite config with dev proxy for `/ws` and `/api` |
 | `nginx.conf` | Production Nginx config with SPA fallback and `/health` endpoint |
