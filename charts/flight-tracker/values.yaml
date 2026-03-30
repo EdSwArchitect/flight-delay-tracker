@@ -18,7 +18,7 @@ opensky-poller:
     tag: latest
   replicaCount: 1
   metricsPort: 8081
-  pollIntervalSec: 15
+  pollIntervalSec: 600
   resources:
     requests:
       cpu: 100m

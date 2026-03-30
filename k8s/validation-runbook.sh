@@ -33,7 +33,7 @@ fi
 # 2. Namespace check
 echo ""
 echo "--- Namespaces ---"
-for ns in ingestion api ui data observability ingress; do
+for ns in default data observability ingress; do
   if kubectl get namespace "$ns" &>/dev/null; then
     pass "Namespace '$ns' exists"
   else
@@ -55,12 +55,12 @@ check_pod() {
   fi
 }
 
-check_pod ingestion opensky-poller "opensky-poller"
-check_pod ingestion airlabs-poller "airlabs-poller"
-check_pod ingestion join-service "join-service"
-check_pod api api "api"
-check_pod api ws-server "ws-server"
-check_pod ui map-ui "map-ui"
+check_pod default opensky-poller "opensky-poller"
+check_pod default airlabs-poller "airlabs-poller"
+check_pod default join-service "join-service"
+check_pod default api "api"
+check_pod default ws-server "ws-server"
+check_pod default map-ui "map-ui"
 
 # Check data services
 if kubectl get pods -n data -l app.kubernetes.io/name=redis -o jsonpath='{.items[0].status.phase}' 2>/dev/null | grep -q Running; then
@@ -78,21 +78,21 @@ fi
 # 4. Redis data
 echo ""
 echo "--- Redis ---"
-POSITION_KEYS=$(kubectl exec -n data deploy/redis-master -- redis-cli KEYS 'flight:position:*' 2>/dev/null | wc -l | tr -d ' ')
+POSITION_KEYS=$(kubectl exec -n data redis-master-0 -- redis-cli KEYS 'flight:position:*' 2>/dev/null | wc -l | tr -d ' ')
 if [[ "$POSITION_KEYS" -gt 0 ]]; then
   pass "Redis has $POSITION_KEYS flight:position keys"
 else
   warn "Redis has 0 flight:position keys (OpenSky may not have polled yet)"
 fi
 
-ENRICHED_KEYS=$(kubectl exec -n data deploy/redis-master -- redis-cli KEYS 'flight:enriched:*' 2>/dev/null | wc -l | tr -d ' ')
+ENRICHED_KEYS=$(kubectl exec -n data redis-master-0 -- redis-cli KEYS 'flight:enriched:*' 2>/dev/null | wc -l | tr -d ' ')
 if [[ "$ENRICHED_KEYS" -gt 0 ]]; then
   pass "Redis has $ENRICHED_KEYS flight:enriched keys"
 else
   warn "Redis has 0 flight:enriched keys (join service may not have run yet)"
 fi
 
-INDEX_SIZE=$(kubectl exec -n data deploy/redis-master -- redis-cli HLEN callsign:index 2>/dev/null || echo "0")
+INDEX_SIZE=$(kubectl exec -n data redis-master-0 -- redis-cli HLEN callsign:index 2>/dev/null || echo "0")
 if [[ "$INDEX_SIZE" -gt 0 ]]; then
   pass "Callsign index has $INDEX_SIZE entries"
 else
@@ -102,14 +102,14 @@ fi
 # 5. Postgres data
 echo ""
 echo "--- Postgres ---"
-SCHEDULE_COUNT=$(kubectl exec -n data deploy/postgresql -- bash -c "PGPASSWORD=flightpass psql -U flightuser -d flightdb -t -c 'SELECT count(*) FROM flight_schedules'" 2>/dev/null | tr -d ' ' || echo "0")
+SCHEDULE_COUNT=$(kubectl exec -n data postgresql-0 -- env PGPASSWORD=flightpass psql -U flightuser -d flightdb -t -c 'SELECT count(*) FROM flight_schedules' 2>/dev/null | tr -d ' ' || echo "0")
 if [[ "$SCHEDULE_COUNT" -gt 0 ]]; then
   pass "flight_schedules has $SCHEDULE_COUNT rows"
 else
   warn "flight_schedules is empty"
 fi
 
-RAW_COUNT=$(kubectl exec -n data deploy/postgresql -- bash -c "PGPASSWORD=flightpass psql -U flightuser -d flightdb -t -c 'SELECT count(*) FROM raw_api_responses'" 2>/dev/null | tr -d ' ' || echo "0")
+RAW_COUNT=$(kubectl exec -n data postgresql-0 -- env PGPASSWORD=flightpass psql -U flightuser -d flightdb -t -c 'SELECT count(*) FROM raw_api_responses' 2>/dev/null | tr -d ' ' || echo "0")
 if [[ "$RAW_COUNT" -gt 0 ]]; then
   pass "raw_api_responses has $RAW_COUNT rows"
 else
@@ -139,7 +139,7 @@ check_http "http://localhost:8080/grafana/api/health" "Grafana"
 # 7. Metrics endpoints (via port-forward or pod exec)
 echo ""
 echo "--- Metrics ---"
-for svc in opensky-poller:8081:ingestion airlabs-poller:8082:ingestion join-service:8083:ingestion; do
+for svc in opensky-poller:8081:default airlabs-poller:8082:default join-service:8083:default; do
   IFS=: read -r name port ns <<< "$svc"
   if kubectl exec -n "$ns" deploy/"$name" -- wget -qO- "http://localhost:$port/metrics" 2>/dev/null | grep -q "# HELP"; then
     pass "$name /metrics is serving Prometheus metrics"
